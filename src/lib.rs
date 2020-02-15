@@ -7,6 +7,7 @@ use std::io;
 
 mod cleanup;
 mod funcs;
+mod utils;
 
 pub fn transpile_file<'a>(filename: &str) -> Result<String, io::Error> {
 	let mut file = File::open(filename)?;

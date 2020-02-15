@@ -1,12 +1,20 @@
 use regex::Captures;
 use regex::Regex;
 use std::borrow::Cow;
+use crate::utils;
 
 /// Process parameter list of function
 mod param_list;
 mod param_item;
 
-/// Process function headers
+/// Transpile function headers. Specifically, to transform the
+/// dart-style positional and named parameters into C# style.
+/// Remove the pair of curly brace indicating the range of named
+/// parameters and provide default values if not exists yet.
+/// Transform functional parameter into Action and Function.
+/// This will ignore the function headers without any function
+/// body, because it is hard to differentiate them from function
+/// invocations.
 pub fn transpile_func_head<'a>(input: &'a str) -> Cow::<'a, str> {
 
 	lazy_static! {
@@ -32,26 +40,29 @@ pub fn transpile_func_head<'a>(input: &'a str) -> Cow::<'a, str> {
 					)? # Line without eol
 				)
 			\s*\) # End of parameter list
+
+      (?P<trailing>\s*(?::|=>|\{)) # To differentiate function header from funtion invocation
 		"
 		).unwrap();
 	}
 
 	RE.replace_all(input, |cap: &Captures| -> String {
-		let leading_space = match cap.name("leading_space") {
-			Some(space) => space.as_str(),
-			None => "",
-		};
+		let leading_space = cap.name("leading_space").unwrap().as_str();
 		let return_type = cap.name("rtype");
 		let func_name = match cap.name("fname") {
 			Some(name) => name.as_str(),
 			None => panic!("No function name!")
 		};
+    if utils::is_keyword(func_name) {
+      return cap.get(0).unwrap().as_str().to_string();
+    }
 		let is_public = !func_name.starts_with("_");
 		let params = match cap.name("params") {
 			Some(content) => content.as_str(),
 			None => panic!("No parameter list!")
 		};
-		return format!("{}{}{}{}({})",
+    let trailing = cap.name("trailing").unwrap().as_str();
+		return format!("{}{}{}{}({}){}",
 			leading_space,
 			if is_public {"public "} else {""},
 			if let Some(typename) = return_type {
@@ -60,7 +71,8 @@ pub fn transpile_func_head<'a>(input: &'a str) -> Cow::<'a, str> {
 				String::from("")
 			},
 			func_name,
-			params
+			param_list::transpile_params(params),
+      trailing
 		)
 	})
 }
@@ -77,12 +89,10 @@ mod tests {
   NodeMetadata meta, {
   BuildOp buildOp,
   Iterable<String> stylesPrepend,
-})"),
-			r"public NodeMetadata lazySet(
-  NodeMetadata meta = null,
-  BuildOp buildOp = null,
-  Iterable<String> stylesPrepend = null,
-)"
+}) {"),
+			r"public NodeMetadata lazySet(NodeMetadata meta,
+BuildOp buildOp = null,
+Iterable<String> stylesPrepend = null) {"
 		);
 	}
 
@@ -101,10 +111,8 @@ mod tests {
   final TextBlock block;
   final Iterable<Widget> widgets;
 
-  public BuiltPieceSimple(
-    this.block = null,
-    this.widgets = null,
-  ) : assert((block == null) != (widgets == null));"
+  public BuiltPieceSimple(this.block = null,
+this.widgets = null) : assert((block == null) != (widgets == null));"
 		);
 	}
 
@@ -122,12 +130,11 @@ mod tests {
         ..left = left ?? this.left
         ..right = right ?? this.right
         ..top = top ?? this.top;"),
-			r"public CssMargin copyWith(
-    CssLength bottom = null,
-    CssLength left = null,
-    CssLength right = null,
-    CssLength top = null
-  ) =>
+
+			r"public CssMargin copyWith(CssLength bottom = null,
+CssLength left = null,
+CssLength right = null,
+CssLength top = null) =>
       CssMargin()
         ..bottom = bottom ?? this.bottom
         ..left = left ?? this.left
@@ -143,7 +150,11 @@ mod tests {
       : assert(block != null),
         assert(data != null),
         assert(tsb != null);"),
-			r"public DataBit(this.block, this.data, this.tsb, this.onTap = null)
+
+			r"public DataBit(this.block,
+this.data,
+this.tsb,
+this.onTap = null)
       : assert(block != null),
         assert(data != null),
         assert(tsb != null);"
@@ -226,11 +237,9 @@ mod tests {
         onTap: onTap ?? this.onTap,
       );"),
 			r"
-  public DataBit rebuild(
-    String data = null,
-    VoidCallback onTap = null,
-    TextStyleBuilders tsb = null
-  ) =>
+  public DataBit rebuild(String data = null,
+VoidCallback onTap = null,
+TextStyleBuilders tsb = null) =>
       DataBit(
         block,
         data ?? this.data,
@@ -249,10 +258,8 @@ mod tests {
     this.widgets,
   }) : assert((block == null) != (widgets == null));"),
 			r"
-  public BuiltPieceSimple(
-    this.block = null,
-    this.widgets = null
-  ) : assert((block == null) != (widgets == null));"
+  public BuiltPieceSimple(this.block = null,
+this.widgets = null) : assert((block == null) != (widgets == null));"
 		);
 	}
 
@@ -276,10 +283,8 @@ class BuiltPieceSimple extends BuiltPiece {
   final TextBlock block;
   final Iterable<Widget> widgets;
 
-  public BuiltPieceSimple(
-    this.block = null,
-    this.widgets = null
-  ) : assert((block == null) != (widgets == null));
+  public BuiltPieceSimple(this.block = null,
+this.widgets = null) : assert((block == null) != (widgets == null));
 
   bool get hasWidgets => widgets != null;
 }"
