@@ -18,4 +18,13 @@ mod tests {
 		assert!(is_keyword("final"));
 		assert!(is_keyword("class"));
 	}
+
+	#[test]
+	fn not_keyword_test() {
+		assert!(!is_keyword("function"));
+		assert!(!is_keyword("def"));
+		assert!(!is_keyword("list"));
+		assert!(!is_keyword("set"));
+		assert!(!is_keyword("i f"));
+	}
 }
