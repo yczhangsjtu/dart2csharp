@@ -3,7 +3,7 @@ use regex::Regex;
 /// Given a stirng representing an item in parameter list
 /// Add default value (null) to it if it doesn't have yet
 /// If there is @required, replace it with a /* TODO: check null */
-fn append_default_value<'a>(input: &'a str) -> String {
+pub fn append_default_value<'a>(input: &'a str) -> String {
 	lazy_static! {
 		static ref RE : Regex = Regex::new(r"(?P<nospace>\S)(?P<trailing>\s*)$").unwrap();
 	}
@@ -18,7 +18,7 @@ fn append_default_value<'a>(input: &'a str) -> String {
 
 /// If a function parameter is a function, replace it with an
 /// Action or Function type parameter
-fn create_function_action<'a>(input: &'a str) -> String {
+pub fn create_function_action<'a>(input: &'a str) -> String {
 	lazy_static! {
 		static ref RE : Regex = Regex::new(r"(?x)
 			^(?P<leading>\s*)(?P<rtype>\w+)\s+(?P<fname>\w+)\s*\( # Function return type and name

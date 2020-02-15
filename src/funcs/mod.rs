@@ -53,7 +53,7 @@ pub fn transpile_func_head<'a>(input: &'a str) -> Cow::<'a, str> {
 		};
 		return format!("{}{}{}{}({})",
 			leading_space,
-			if is_public {"public "} else {"private "},
+			if is_public {"public "} else {""},
 			if let Some(typename) = return_type {
 				format!("{} ", typename.as_str())
 			} else {

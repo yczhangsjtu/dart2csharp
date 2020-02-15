@@ -2,6 +2,24 @@ use regex::Regex;
 
 use super::param_item;
 
+pub fn transpile_params(input: &str) -> String {
+	let (positional, named) = split_parameter_list(input);
+
+	let positional = positional.iter().map(|item| {
+		param_item::create_function_action(item)
+	}).collect::<Vec<String>>().join(",\n");
+
+	let named = named.iter().map(|item| {
+		param_item::append_default_value(
+			&param_item::create_function_action(item))
+	}).collect::<Vec<String>>().join(",\n");
+
+	if positional.is_empty() || named.is_empty() {
+		format!("{}{}", positional, named)
+	} else {
+		format!("{},\n{}", positional, named)
+	}
+}
 
 /// Given a parameter list, split it into two strings,
 /// the first represents the positional parameters
@@ -267,6 +285,23 @@ mod tests {
 		);
 	}
 
+
+	#[test]
+	fn params_transpiled_1() {
+		assert_eq!(
+			transpile_params(
+				r"
+  NodeMetadata meta, {
+  BuildOp buildOp,
+  Iterable<String> stylesPrepend,
+}
+			"),
+			"NodeMetadata meta,
+BuildOp buildOp = null,
+Iterable<String> stylesPrepend = null"
+		);
+	}
+
 	#[test]
 	fn parameter_list_splitted_2() {
 		assert_eq!(
@@ -294,6 +329,20 @@ mod tests {
 			"),
 			(Option::None, Option::Some("this.block,
     this.widgets"))
+		);
+	}
+
+	#[test]
+	fn params_transpiled_2() {
+		assert_eq!(
+			transpile_params(
+				r"{
+    this.block,
+    this.widgets
+  }
+			"),
+			"this.block = null,
+this.widgets = null"
 		);
 	}
 
@@ -338,6 +387,24 @@ mod tests {
 	}
 
 	#[test]
+	fn params_transpiled_3() {
+		assert_eq!(
+			transpile_params(
+				r"{
+    CssLength bottom,
+    CssLength left,
+    CssLength right,
+    CssLength top,
+  }
+			"),
+			"CssLength bottom = null,
+CssLength left = null,
+CssLength right = null,
+CssLength top = null"
+		);
+	}
+
+	#[test]
 	fn parameter_list_splitted_4() {
 		assert_eq!(
 			split_parameter_list(
@@ -358,6 +425,18 @@ mod tests {
 			split_positioned_named(
 				r"this.block, this.data, this.tsb, {this.onTap}"),
 			(Option::Some("this.block, this.data, this.tsb,"), Option::Some("this.onTap"))
+		);
+	}
+
+	#[test]
+	fn params_transpiled_4() {
+		assert_eq!(
+			transpile_params(
+				r"this.block, this.data, this.tsb, {this.onTap}"),
+			"this.block,
+this.data,
+this.tsb,
+this.onTap = null"
 		);
 	}
 
@@ -383,6 +462,15 @@ mod tests {
 	}
 
 	#[test]
+	fn params_transpiled_5() {
+		assert_eq!(
+			transpile_params(
+				r"void f(String key, String value)"),
+			"Action<String, String> f"
+		);
+	}
+
+	#[test]
 	fn parameter_list_splitted_6() {
 		assert_eq!(
 			split_parameter_list(
@@ -400,6 +488,15 @@ mod tests {
 			split_positioned_named(
 				r""),
 			(Option::None, Option::None)
+		);
+	}
+
+	#[test]
+	fn params_transpiled_6() {
+		assert_eq!(
+			transpile_params(
+				r""),
+			""
 		);
 	}
 }
